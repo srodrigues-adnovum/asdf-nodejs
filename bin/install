@@ -69,7 +69,7 @@ install_nodejs() {
     if [ "${ext}" = "zip" ]; then
       unzip "$download_path" -d "$install_path"
     else
-      tar xpf "$download_path" -C "$install_path"
+      tar xpf "$download_path" -C "$install_path" --strip-components=1
     fi
   else
     echo "Error: nodejs ${version} not found. Run 'asdf list-all nodejs' for available versions." >&2
