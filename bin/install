@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=../lib/utils.bash
+source "${plugin_dir}/../lib/utils.bash"
+
+declare -r RELEASES_URL="https://nodejs.org/dist"
+
+error_exit() {
+  echo "$1" >&2
+  exit "${2:-1}"
+}
+
+get_platform() {
+    case "$(uname -s)" in
+      Darwin) echo "darwin" ;;
+      MINGW64*) echo "win" ;;
+      AIX) echo "aix" ;;
+      *) echo "linux" ;;
+    esac
+}
+
+get_ext() {
+    case "$(uname -s)" in
+      MINGW64*) echo "zip" ;;
+      *) echo "tar.gz" ;;
+    esac
+}
+
+get_arch() {
+  ARCH=$(uname -m)
+  case $ARCH in
+    armv7l) ARCH="armv7l";;
+    arm64 | aarch64) ARCH="arm64";;
+    powerpc64le | ppc64le)  ARCH="ppc64";;
+    x86 | i686 | i386) ARCH="x86";;
+    x86_64) ARCH="x64";;
+  esac
+  echo "$ARCH"
+}
+
+install_nodejs() {
+  local install_type=$1
+  local version=$2
+  local install_path=$3
+
+  local ext; ext=$(get_ext)
+  local filename="node-${version}-$(get_platform)-$(get_arch).${ext}"
+
+  local download_url="${RELEASES_URL}/${version}/${filename}"
+  local tmp_download_dir
+
+  if [ "$TMPDIR" = "" ]; then
+    tmp_download_dir=$(mktemp -d -t nodejs_XXXXXX)
+  else
+    tmp_download_dir=$TMPDIR
+  fi
+
+  local download_path="${tmp_download_dir}/${filename}"
+
+  echo "Downloading nodejs from ${download_url} to ${install_path}"
+
+  if curl -Lfs "${download_url}" -o "${download_path}"; then
+    if [ "${ext}" = "zip" ]; then
+      unzip "$download_path" -d "$install_path"
+    else
+      tar xpf "$download_path" -C "$install_path"
+    fi
+  else
+    echo "Error: nodejs ${version} not found. Run 'asdf list-all nodejs' for available versions." >&2
+    exit 1
+  fi
+}
+
+install_nodejs $ASDF_INSTALL_TYPE $ASDF_INSTALL_VERSION $ASDF_INSTALL_PATH
+
+#ASDF_INSTALL_TYPE=version ASDF_INSTALL_VERSION=v10.22.0 ASDF_INSTALL_PATH=./tmp/bin/v10.22.0 ASDF_DOWNLOAD_PATH=./tmp bash -x ./install
