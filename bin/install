@@ -4,11 +4,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-plugin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# shellcheck source=../lib/utils.bash
-source "${plugin_dir}/../lib/utils.bash"
-
 declare -r RELEASES_URL="https://nodejs.org/dist"
 
 error_exit() {
@@ -49,8 +44,12 @@ install_nodejs() {
   local version=$2
   local install_path=$3
 
+  if [[ $version != v* ]]; then
+    version="v${version}"
+  fi
+
   local ext; ext=$(get_ext)
-  local filename="node-${version}-$(get_platform)-$(get_arch).${ext}"
+  local filename; filename="node-${version}-$(get_platform)-$(get_arch).${ext}"
 
   local download_url="${RELEASES_URL}/${version}/${filename}"
   local tmp_download_dir
@@ -65,18 +64,23 @@ install_nodejs() {
 
   echo "Downloading nodejs from ${download_url} to ${install_path}"
 
-  if curl -Lfs "${download_url}" -o "${download_path}"; then
+  if curl "${download_url}" -o "${download_path}"; then #-Lfs
     if [ "${ext}" = "zip" ]; then
-      unzip "$download_path" -d "$install_path"
+      unzip "$download_path" -d "${tmp_download_dir}"
+      cp -r "${tmp_download_dir}/node-${version}-$(get_platform)-$(get_arch)/." "$install_path"
+      chmod a+x "$install_path/node.exe"
     else
       tar xpf "$download_path" -C "$install_path" --strip-components=1
+      chmod a+x "$install_path/node"
     fi
+    chmod a+x "$install_path/npm"
+    chmod a+x "$install_path/npx"
   else
     echo "Error: nodejs ${version} not found. Run 'asdf list-all nodejs' for available versions." >&2
     exit 1
   fi
 }
 
-install_nodejs $ASDF_INSTALL_TYPE $ASDF_INSTALL_VERSION $ASDF_INSTALL_PATH
+install_nodejs "$ASDF_INSTALL_TYPE" "$ASDF_INSTALL_VERSION" "$ASDF_INSTALL_PATH"
 
 #ASDF_INSTALL_TYPE=version ASDF_INSTALL_VERSION=v10.22.0 ASDF_INSTALL_PATH=./tmp/bin/v10.22.0 ASDF_DOWNLOAD_PATH=./tmp bash -x ./install
